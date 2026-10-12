@@ -1,22 +1,27 @@
 #!/bin/bash
 
-#SBATCH --job-name=trial0
-#SBATCH --account=ec29
-#SBATCH --time=01:00:00
+#SBATCH --job-name=avst
+#SBATCH --account=ec12
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-# #SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=32G
-#SBATCH --partition=ifi_accel
-# #SBATCH --gres=gpu:1
-##SBATCH --qos=devel
-# #SBATCH --mem=32G      
-# #SBATCH --gpus=a100:1
-#SBATCH --gpus=rtx30:1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem-per-cpu=8G
+#SBATCH --partition=accel
+#SBATCH --gpus=1
+#SBATCH --output=avst-%j.out
 
 module purge
-module load UCX-CUDA/1.12.1-GCCcore-11.3.0-CUDA-11.7.0
 module load Python/3.10.4-GCCcore-11.3.0
-source /your/env/dir/avqaoriginal/bin/activate
+source /fp/projects01/ec12/ec-williaan/venvs/avst/bin/activate
 
-DIR=/your/dir/to/AVST
+# repo root (the code uses paths relative to it, e.g. ./AVST/data/...)
+DIR=/fp/projects01/ec12/ec-williaan/MusiQAl
+cd $DIR
+
+# sbatch --export=ALL,SEED=2 AVST/Test.sh  to train another seed
+SEED=${SEED:-1}
+
+python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs 30 --mode train --seed $SEED --checkpoint avst_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
+
+python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --mode test --checkpoint avst_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}

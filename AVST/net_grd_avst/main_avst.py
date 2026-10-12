@@ -91,13 +91,11 @@ def eval(model, val_loader,epoch):
     return 100 * correct_qa / total_qa
 
 
-def test(model, val_loader, label_test, pred_out=None):
+def test(model, val_loader):
     model.eval()
     total = 0
     correct = 0
-    samples = json.load(open(label_test, 'r'))
-    ans_vocab = val_loader.dataset.ans_vocab
-    records = []
+    samples = json.load(open('./AVST/data/json/avqa-test.json', 'r'))
     A_ext = []
     A_count = []
     A_cmp = []
@@ -128,10 +126,6 @@ def test(model, val_loader, label_test, pred_out=None):
 
             x = samples[batch_idx]
             type =ast.literal_eval(x['type'])
-            records.append({'question_id': x['question_id'], 'video_id': x['video_id'],
-                            'modality': type[0], 'qtype': type[1],
-                            'pred': ans_vocab[predicted.item()], 'answer': x['answer'],
-                            'correct': int((predicted == target).sum().item())})
             if type[0] == 'Audio':
                 if type[1] == 'Existential':
                     A_ext.append((predicted == target).sum().item())
@@ -216,12 +210,6 @@ def test(model, val_loader, label_test, pred_out=None):
     print('Overall Accuracy: %.2f %%' % (
             100 * correct / total))
 
-    if pred_out:
-        os.makedirs(os.path.dirname(pred_out) or '.', exist_ok=True)
-        with open(pred_out, 'w') as f:
-            json.dump(records, f, indent=1)
-        print('Saved per-question predictions to %s' % pred_out)
-
     return 100 * correct / total
 
 def main():
@@ -261,20 +249,12 @@ def main():
         "--checkpoint", type=str, default='avst', help="save model name")
     parser.add_argument(
         '--gpu', type=str, default='0, 1', help='gpu device number')
-    parser.add_argument(
-        '--num_workers', type=int, default=1, help='dataloader workers for train/val')
-    parser.add_argument(
-        '--grounding_ckpt', type=str, default='./AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt', help='pretrained grounding model')
-    parser.add_argument(
-        '--pred_out', type=str, default=None, help='test mode: save per-question predictions to this json file')
 
 
     args = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
     torch.manual_seed(args.seed)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
 
     if args.model == 'AVQA_Fusion_Net':
         model = AVQA_Fusion_Net()
@@ -286,15 +266,15 @@ def main():
     if args.mode == 'train':
         train_dataset = AVQA_dataset(label=args.label_train, audio_dir=args.audio_dir, video_res14x14_dir=args.video_res14x14_dir,
                                     transform=transforms.Compose([ToTensor()]), mode_flag='train')
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=1, pin_memory=True)
         val_dataset = AVQA_dataset(label=args.label_val, audio_dir=args.audio_dir, video_res14x14_dir=args.video_res14x14_dir,
                                     transform=transforms.Compose([ToTensor()]), mode_flag='val')
-        val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
 
         # ===================================== load pretrained model ===============================================
         ####### concat model
-        pretrained_file = args.grounding_ckpt
+        pretrained_file = "./AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt"
         checkpoint = torch.load(pretrained_file)
         print("\n-------------- loading pretrained models --------------")
         model_dict = model.state_dict()
@@ -329,7 +309,7 @@ def main():
         print(test_dataset.__len__())
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
         model.load_state_dict(torch.load(args.model_save_dir + args.checkpoint + ".pt"))
-        test(model, test_loader, args.label_test, args.pred_out)
+        test(model, test_loader)
 
 
 if __name__ == '__main__':
