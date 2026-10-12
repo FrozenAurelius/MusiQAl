@@ -115,13 +115,14 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     params = vars(args)
 
-    if params['model'] == 'inception_v3':
+    # The model actually used is AVQA_Fusion_Net below (local ResNet-18 weights);
+    # skip the unused pretrainedmodels download so this runs offline.
+    load_image_fn = None
+    if params['model'] == 'resnet18':
+        pass
+    elif params['model'] == 'inception_v3':
         C, H, W = 3, 299, 299
         model = pretrainedmodels.inceptionv3(pretrained='imagenet')
-        load_image_fn = utils.LoadTransformImage(model)
-    elif params['model'] == 'resnet18':
-        C, H, W = 3, 224, 224
-        model = pretrainedmodels.resnet18(pretrained='imagenet')
         load_image_fn = utils.LoadTransformImage(model)
     elif params['model'] == 'resnet152':
         C, H, W = 3, 224, 224

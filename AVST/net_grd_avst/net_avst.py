@@ -87,11 +87,11 @@ class AVQA_Fusion_Net(nn.Module):
         self.attn_v = nn.MultiheadAttention(512, 4, dropout=0.1)
 
         # question
-        self.question_encoder = QstEncoder(235, 512, 512, 1, 512)
+        self.question_encoder = QstEncoder(237, 512, 512, 1, 512)   # len(ques_vocab) built from avqa-train.json
 
         self.tanh = nn.Tanh()
         self.dropout = nn.Dropout(0.5)
-        self.fc_ans = nn.Linear(512, 143)
+        self.fc_ans = nn.Linear(512, 146)   # len(ans_vocab) built from avqa-train.json
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc_gl=nn.Linear(1024,512)

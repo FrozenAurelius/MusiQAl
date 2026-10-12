@@ -219,7 +219,8 @@ def _resnet(arch, block, layers, pretrained, progress, modal, **kwargs):
     model = ResNet(block, layers, modal, **kwargs)
     if pretrained:
         print('---------- >>> load pretrained res-18 <<< ----------\n')
-        model.load_state_dict(torch.load('./MUSIC-AVQA_CVPR2022/pretrained/resnet18-5c106cde.pth'), strict=False)
+        # official torchvision file in legacy format (sha256 5c106cde...); needs weights_only=False on torch>=2.6
+        model.load_state_dict(torch.load('./AVST/pretrained/resnet18-5c106cde.pth', weights_only=False), strict=False)
     return model
 
 def resnet18(pretrained=False, progress=True, modal='vision',**kwargs):

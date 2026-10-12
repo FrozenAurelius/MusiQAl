@@ -80,10 +80,11 @@ class AVQA_dataset(Dataset):
         audio = audio[::6, :]
 
         visual_out_res18_path = './AVST/data/feats/res18_14x14'
-        visual_posi = np.load(os.path.join(self.video_res14x14_dir, name + '.npy'))  
+        # mmap: only the selected frames are read from disk (values are identical to a full load)
+        visual_posi = np.load(os.path.join(self.video_res14x14_dir, name + '.npy'), mmap_mode='r')
         
         # visual_posi [60, 512, 14, 14], select 10 frames from one video
-        visual_posi = visual_posi[::6, :]
+        visual_posi = np.ascontiguousarray(visual_posi[::6, :])
         video_idx=self.video_list.index(name)
 
         for i in range(visual_posi.shape[0]):
@@ -95,10 +96,9 @@ class AVQA_dataset(Dataset):
             neg_video_id = int(neg_frame_id / 60)
             neg_frame_flag = neg_frame_id % 60
             neg_video_name = self.video_list[neg_video_id]
-            visual_nega_out_res18=np.load(os.path.join(self.video_res14x14_dir, neg_video_name + '.npy'))
+            visual_nega_out_res18=np.load(os.path.join(self.video_res14x14_dir, neg_video_name + '.npy'), mmap_mode='r')
 
-            visual_nega_out_res18 = torch.from_numpy(visual_nega_out_res18)
-            visual_nega_clip=visual_nega_out_res18[neg_frame_flag,:,:,:].unsqueeze(0)
+            visual_nega_clip=torch.from_numpy(np.array(visual_nega_out_res18[neg_frame_flag,:,:,:])).unsqueeze(0)
 
             if(i==0):
                 visual_nega=visual_nega_clip
