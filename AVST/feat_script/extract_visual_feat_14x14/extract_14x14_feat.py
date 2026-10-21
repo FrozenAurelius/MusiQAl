@@ -115,8 +115,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     params = vars(args)
 
-    # The model actually used is AVQA_Fusion_Net below (local ResNet-18 weights);
-    # skip the unused pretrainedmodels download so this runs offline.
+    # resnet18 weights are loaded in AVQA_Fusion_Net below
     load_image_fn = None
     if params['model'] == 'resnet18':
         pass

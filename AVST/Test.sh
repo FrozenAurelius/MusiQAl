@@ -2,20 +2,21 @@
 
 #SBATCH --job-name=avst
 #SBATCH --account=ec12
-#SBATCH --time=03:00:00
+#SBATCH --time=08:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8G
 #SBATCH --partition=accel
 #SBATCH --gpus=1
 #SBATCH --output=avst-%j.out
 
+export PYTHONUNBUFFERED=1
 module purge
 module load Python/3.10.4-GCCcore-11.3.0
 source /fp/projects01/ec12/ec-williaan/venvs/avst/bin/activate
 
-# repo root (the code uses paths relative to it, e.g. ./AVST/data/...)
+# repo root
 DIR=/fp/projects01/ec12/ec-williaan/MusiQAl
 cd $DIR
 
@@ -23,6 +24,13 @@ cd $DIR
 SEED=${SEED:-1}
 EPOCHS=${EPOCHS:-30}   # sbatch --export=ALL,EPOCHS=1 AVST/Test.sh  for a quick check
 
-python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs $EPOCHS --mode train --seed $SEED --checkpoint avst_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
+# resnet18 feats by default, for dinov2:
+#   sbatch --export=ALL,FEATS=dinov2_vitb14_reg,VDIM=768,NAME=avst_dinov2 AVST/Test.sh
+FEATS=${FEATS:-res18_14x14}
+VDIM=${VDIM:-512}
+NAME=${NAME:-avst}
+VIS="--video_res14x14_dir AVST/data/feats/$FEATS --visual_dim $VDIM"
 
-python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --mode test --checkpoint avst_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
+python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs $EPOCHS --mode train --seed $SEED $VIS --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
+
+python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --mode test $VIS --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}

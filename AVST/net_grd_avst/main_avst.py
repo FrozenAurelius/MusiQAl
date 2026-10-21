@@ -222,6 +222,8 @@ def main():
     #     "--video_dir", type=str, default='/home/guangyao_li/dataset/avqa/avqa-frames-1fps', help="video dir")
     parser.add_argument(
         "--video_res14x14_dir", type=str, default='./AVST/data/feats/res18_14x14', help="res14x14 dir")
+    parser.add_argument(
+        "--visual_dim", type=int, default=512, help="feature size per cell: 512 for ResNet-18, 768 for DINOv2")
     
     parser.add_argument(
         "--label_train", type=str, default="./data/json/avqa-train.json", help="train csv file")
@@ -257,7 +259,7 @@ def main():
     torch.manual_seed(args.seed)
 
     if args.model == 'AVQA_Fusion_Net':
-        model = AVQA_Fusion_Net()
+        model = AVQA_Fusion_Net(visual_dim=args.visual_dim)
         model = nn.DataParallel(model)
         model = model.to('cuda')
     else:
@@ -266,10 +268,10 @@ def main():
     if args.mode == 'train':
         train_dataset = AVQA_dataset(label=args.label_train, audio_dir=args.audio_dir, video_res14x14_dir=args.video_res14x14_dir,
                                     transform=transforms.Compose([ToTensor()]), mode_flag='train')
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=1, pin_memory=True)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=6, pin_memory=True)
         val_dataset = AVQA_dataset(label=args.label_val, audio_dir=args.audio_dir, video_res14x14_dir=args.video_res14x14_dir,
                                     transform=transforms.Compose([ToTensor()]), mode_flag='val')
-        val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=6, pin_memory=True)
 
 
         # ===================================== load pretrained model ===============================================

@@ -52,8 +52,11 @@ class QstEncoder(nn.Module):
 
 class AVQA_Fusion_Net(nn.Module):
 
-    def __init__(self):
+    def __init__(self, visual_dim=512):
         super(AVQA_Fusion_Net, self).__init__()
+
+        # dinov2: 768 -> 512
+        self.fc_visual = nn.Linear(visual_dim, 512) if visual_dim != 512 else None
 
         # for features
         self.fc_a1 =  nn.Linear(128, 512)
@@ -87,11 +90,11 @@ class AVQA_Fusion_Net(nn.Module):
         self.attn_v = nn.MultiheadAttention(512, 4, dropout=0.1)
 
         # question
-        self.question_encoder = QstEncoder(237, 512, 512, 1, 512)   # len(ques_vocab) built from avqa-train.json
+        self.question_encoder = QstEncoder(237, 512, 512, 1, 512)   # len(ques_vocab)
 
         self.tanh = nn.Tanh()
         self.dropout = nn.Dropout(0.5)
-        self.fc_ans = nn.Linear(512, 146)   # len(ans_vocab) built from avqa-train.json
+        self.fc_ans = nn.Linear(512, 146)   # len(ans_vocab)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc_gl=nn.Linear(1024,512)
@@ -114,6 +117,11 @@ class AVQA_Fusion_Net(nn.Module):
             input visual_posi shape: [B, T, C, H, W]
             input visual_nega shape: [B, T, C, H, W]
         '''
+
+        ## dinov2 feats [B, T, 768, H, W] -> [B, T, 512, H, W]
+        if self.fc_visual is not None:
+            visual_posi = self.fc_visual(visual_posi.permute(0, 1, 3, 4, 2)).permute(0, 1, 4, 2, 3).contiguous()
+            visual_nega = self.fc_visual(visual_nega.permute(0, 1, 3, 4, 2)).permute(0, 1, 4, 2, 3).contiguous()
 
         ## question features
         qst_feature = self.question_encoder(question)
