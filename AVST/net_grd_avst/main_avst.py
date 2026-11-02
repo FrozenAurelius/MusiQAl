@@ -91,11 +91,11 @@ def eval(model, val_loader,epoch):
     return 100 * correct_qa / total_qa
 
 
-def test(model, val_loader):
+def test(model, val_loader, label_test):
     model.eval()
     total = 0
     correct = 0
-    samples = json.load(open('./AVST/data/json/avqa-test.json', 'r'))
+    samples = json.load(open(label_test, 'r'))
     A_ext = []
     A_count = []
     A_cmp = []
@@ -224,6 +224,10 @@ def main():
         "--video_res14x14_dir", type=str, default='./AVST/data/feats/res18_14x14', help="res14x14 dir")
     parser.add_argument(
         "--visual_dim", type=int, default=512, help="feature size per cell: 512 for ResNet-18, 768 for DINOv2")
+    parser.add_argument(
+        "--temporal_layers", type=int, default=0, help="temporal transformer layers over the frames, 0 = none")
+    parser.add_argument(
+        "--grounding_ckpt", type=str, default='./AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt', help="pretrained grounding stage")
     
     parser.add_argument(
         "--label_train", type=str, default="./data/json/avqa-train.json", help="train csv file")
@@ -254,12 +258,13 @@ def main():
 
 
     args = parser.parse_args()
+    print(args)
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
     torch.manual_seed(args.seed)
 
     if args.model == 'AVQA_Fusion_Net':
-        model = AVQA_Fusion_Net(visual_dim=args.visual_dim)
+        model = AVQA_Fusion_Net(visual_dim=args.visual_dim, temporal_layers=args.temporal_layers)
         model = nn.DataParallel(model)
         model = model.to('cuda')
     else:
@@ -276,13 +281,17 @@ def main():
 
         # ===================================== load pretrained model ===============================================
         ####### concat model
-        pretrained_file = "./AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt"
-        checkpoint = torch.load(pretrained_file)
+        pretrained_file = args.grounding_ckpt
+        checkpoint = torch.load(pretrained_file, map_location='cpu')
         print("\n-------------- loading pretrained models --------------")
         model_dict = model.state_dict()
         tmp = ['module.fc_a1.weight', 'module.fc_a1.bias','module.fc_a2.weight','module.fc_a2.bias','module.fc_gl.weight','module.fc_gl.bias','module.fc1.weight', 'module.fc1.bias','module.fc2.weight', 'module.fc2.bias','module.fc3.weight', 'module.fc3.bias','module.fc4.weight', 'module.fc4.bias']
         tmp2 = ['module.fc_a1.weight', 'module.fc_a1.bias','module.fc_a2.weight','module.fc_a2.bias']
+        # 768 -> 512 layer, only in a grounding stage trained on dinov2 feats
+        if args.visual_dim != 512:
+            tmp += ['module.fc_visual.weight', 'module.fc_visual.bias']
         pretrained_dict1 = {k: v for k, v in checkpoint.items() if k in tmp}
+        print("from", pretrained_file, ":", sorted(pretrained_dict1))
         pretrained_dict2 = {str(k).split('.')[0]+'.'+str(k).split('.')[1]+'_pure.'+str(k).split('.')[-1]: v for k, v in checkpoint.items() if k in tmp2}
 
         model_dict.update(pretrained_dict1) #利用预训练模型的参数，更新模型
@@ -311,7 +320,7 @@ def main():
         print(test_dataset.__len__())
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
         model.load_state_dict(torch.load(args.model_save_dir + args.checkpoint + ".pt"))
-        test(model, test_loader)
+        test(model, test_loader, args.label_test)
 
 
 if __name__ == '__main__':

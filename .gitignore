@@ -5,6 +5,7 @@ AVST/net_grd_avst/avst_models/*.pt
 !AVST/net_grd_avst/avst_models/avst.pt
 !AVST/net_grd_avst/avst_models/avst_update.pt
 AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt
+AVST/grounding_gen/models_grounding_gen/grounding_*.pt
 
 # run outputs
 runs/

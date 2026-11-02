@@ -29,8 +29,12 @@ EPOCHS=${EPOCHS:-30}   # sbatch --export=ALL,EPOCHS=1 AVST/Test.sh  for a quick 
 FEATS=${FEATS:-res18_14x14}
 VDIM=${VDIM:-512}
 NAME=${NAME:-avst}
-VIS="--video_res14x14_dir AVST/data/feats/$FEATS --visual_dim $VDIM"
+# grounding stage to start from, see Grounding.sh
+GRD=${GRD:-AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt}
+# temporal transformer layers, 0 = none
+TEMP=${TEMP:-0}
+VIS="--video_res14x14_dir AVST/data/feats/$FEATS --visual_dim $VDIM --temporal_layers $TEMP"
 
-python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs $EPOCHS --mode train --seed $SEED $VIS --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
+python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs $EPOCHS --mode train --seed $SEED $VIS --grounding_ckpt $GRD --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
 
 python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --mode test $VIS --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}

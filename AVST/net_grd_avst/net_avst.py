@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
-from visual_net import resnet18
 
 
 def batch_organize(out_match_posi, out_match_nega):
@@ -52,7 +51,7 @@ class QstEncoder(nn.Module):
 
 class AVQA_Fusion_Net(nn.Module):
 
-    def __init__(self, visual_dim=512):
+    def __init__(self, visual_dim=512, temporal_layers=0):
         super(AVQA_Fusion_Net, self).__init__()
 
         # dinov2: 768 -> 512
@@ -64,9 +63,6 @@ class AVQA_Fusion_Net(nn.Module):
 
         self.fc_a1_pure =  nn.Linear(128, 512)
         self.fc_a2_pure=nn.Linear(512,512)
-        self.visual_net = resnet18(pretrained=True)
-
-        self.fc_v = nn.Linear(2048, 512)
         self.fc_st = nn.Linear(512, 512)
         self.fc_fusion = nn.Linear(1024, 512)
         self.fc = nn.Linear(1024, 512)
@@ -109,6 +105,26 @@ class AVQA_Fusion_Net(nn.Module):
         self.fc4 = nn.Linear(128, 2)
         self.relu4 = nn.ReLU()
 
+        # temporal transformer over the 10 frames, separately for each grid cell.
+        # created last so the other layers get the same init as without it.
+        # temporal_out starts at zero, so the model starts out as without it
+        self.temporal = None
+        if temporal_layers > 0:
+            layer = nn.TransformerEncoderLayer(d_model=512, nhead=4, dim_feedforward=1024, dropout=0.1, batch_first=True)
+            self.temporal = nn.TransformerEncoder(layer, num_layers=temporal_layers)
+            self.temporal_pos = nn.Parameter(torch.randn(1, 10, 512) * 0.02)
+            self.temporal_out = nn.Linear(512, 512)
+            nn.init.zeros_(self.temporal_out.weight)
+            nn.init.zeros_(self.temporal_out.bias)
+
+
+    def temporal_encode(self, visual):
+        # [B, T, C, H, W] -> [B*H*W, T, C], residual, -> [B, T, C, H, W]
+        B, T, C, H, W = visual.size()
+        x = visual.permute(0, 3, 4, 1, 2).reshape(B * H * W, T, C)
+        x = x + self.temporal_out(self.temporal(x + self.temporal_pos[:, :T]))
+        return x.view(B, H, W, T, C).permute(0, 3, 4, 1, 2).contiguous()
+
 
     def forward(self, audio, visual_posi, visual_nega, question):
         '''
@@ -122,6 +138,11 @@ class AVQA_Fusion_Net(nn.Module):
         if self.fc_visual is not None:
             visual_posi = self.fc_visual(visual_posi.permute(0, 1, 3, 4, 2)).permute(0, 1, 4, 2, 3).contiguous()
             visual_nega = self.fc_visual(visual_nega.permute(0, 1, 3, 4, 2)).permute(0, 1, 4, 2, 3).contiguous()
+
+        ## frames see each other. nega gets it too, so posi and nega look alike to the match layers
+        if self.temporal is not None:
+            visual_posi = self.temporal_encode(visual_posi)
+            visual_nega = self.temporal_encode(visual_nega)
 
         ## question features
         qst_feature = self.question_encoder(question)
