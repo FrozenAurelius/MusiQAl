@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from dataloader_avst import *
 from net_avst import AVQA_Fusion_Net
 import ast
+import random
 import json
 import numpy as np
 import pdb
@@ -91,8 +92,31 @@ def eval(model, val_loader,epoch):
     return 100 * correct_qa / total_qa
 
 
-def test(model, val_loader, label_test):
+def ablate_input(x, how, other):
+    # zero: all zeros. noise: gaussian with the same mean/std as x. shuffle: the same input from another video
+    if how == 'zero':
+        return torch.zeros_like(x)
+    if how == 'noise':
+        return torch.randn_like(x) * x.std() + x.mean()
+    if how == 'shuffle':
+        return other
+    return x
+
+
+def other_video(dataset, idx, samples):
+    # a test question about a different video, the same one every run
+    rng = random.Random(idx)
+    while True:
+        j = rng.randrange(len(samples))
+        if samples[j]['video_id'] != samples[idx]['video_id']:
+            return dataset[j]
+
+
+def test(model, val_loader, label_test, ablate='none'):
+    # ablate: '<audio|visual|both>_<zero|noise|shuffle>' replaces that input at test time, 'none' = normal test
     model.eval()
+    part, how = ablate.split('_') if ablate != 'none' else ('', '')
+    torch.manual_seed(0)
     total = 0
     correct = 0
     samples = json.load(open(label_test, 'r'))
@@ -116,6 +140,14 @@ def test(model, val_loader, label_test):
     with torch.no_grad():
         for batch_idx, sample in enumerate(val_loader):
             audio,visual_posi,visual_nega, target, question = sample['audio'].to('cuda'), sample['visual_posi'].to('cuda'),sample['visual_nega'].to('cuda'), sample['label'].to('cuda'), sample['question'].to('cuda')
+
+            if how:
+                other = other_video(val_loader.dataset, batch_idx, samples) if how == 'shuffle' else None
+                if part in ('audio', 'both'):
+                    audio = ablate_input(audio, how, torch.as_tensor(other['audio']).unsqueeze(0).to('cuda') if other else None)
+                if part in ('visual', 'both'):
+                    # the answer only uses visual_posi, visual_nega is for the match loss
+                    visual_posi = ablate_input(visual_posi, how, torch.as_tensor(other['visual_posi']).unsqueeze(0).to('cuda') if other else None)
 
             preds_qa,out_match_posi,out_match_nega = model(audio, visual_posi,visual_nega, question)
             preds = preds_qa
@@ -228,6 +260,10 @@ def main():
         "--temporal_layers", type=int, default=0, help="temporal transformer layers over the frames, 0 = none")
     parser.add_argument(
         "--grounding_ckpt", type=str, default='./AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt', help="pretrained grounding stage")
+    parser.add_argument(
+        "--ablate", type=str, default='none',
+        choices=['none'] + [p + '_' + h for p in ['audio', 'visual', 'both'] for h in ['zero', 'noise', 'shuffle']],
+        help="test only: replace an input with zeros, noise or another video's input")
     
     parser.add_argument(
         "--label_train", type=str, default="./data/json/avqa-train.json", help="train csv file")
@@ -320,7 +356,7 @@ def main():
         print(test_dataset.__len__())
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
         model.load_state_dict(torch.load(args.model_save_dir + args.checkpoint + ".pt"))
-        test(model, test_loader, args.label_test)
+        test(model, test_loader, args.label_test, args.ablate)
 
 
 if __name__ == '__main__':

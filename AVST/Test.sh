@@ -32,8 +32,8 @@ NAME=${NAME:-avst}
 # grounding stage to start from, see Grounding.sh
 GRD=${GRD:-AVST/grounding_gen/models_grounding_gen/main_grounding_gen_best.pt}
 # temporal transformer layers, 0 = none
-TEMP=${TEMP:-0}
-VIS="--video_res14x14_dir AVST/data/feats/$FEATS --visual_dim $VDIM --temporal_layers $TEMP"
+TLAYERS=${TLAYERS:-0}
+VIS="--video_res14x14_dir AVST/data/feats/$FEATS --visual_dim $VDIM --temporal_layers $TLAYERS"
 
 python AVST/net_grd_avst/main_avst.py --label_train AVST/data/json/avqa-train.json --label_val AVST/data/json/avqa-val.json --label_test AVST/data/json/avqa-test.json --batch-size 16 --epochs $EPOCHS --mode train --seed $SEED $VIS --grounding_ckpt $GRD --checkpoint ${NAME}_seed$SEED --model_save_dir AVST/net_grd_avst/avst_models/ --gpu ${CUDA_VISIBLE_DEVICES:-0}
 

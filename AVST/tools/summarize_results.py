@@ -1,7 +1,8 @@
 """Mean and std of test accuracy over seeds, per setup and question type.
 
-Reads the slurm logs from Test.sh (avst-*.out). The setup is the --checkpoint
-name without _seedN, e.g. avst_dinov2_seed2 -> avst_dinov2.
+Reads the slurm logs from Test.sh (avst-*.out) and Ablation.sh (ablate-*.out). The setup is
+the --checkpoint name without _seedN, e.g. avst_dinov2_seed2 -> avst_dinov2, plus the
+ablation if there is one, e.g. avst_dinov2+visual_zero. A log can hold several test runs.
 
     python AVST/tools/summarize_results.py avst-*.out
     python AVST/tools/summarize_results.py avst-*.out --latex
@@ -13,21 +14,27 @@ from collections import defaultdict
 
 ACC = re.compile(r"^(\S.*?) Accuracy: ([\d.]+) %")
 CKPT = re.compile(r"checkpoint='([^']+)'")
+ABL = re.compile(r"ablate='([^']+)'")
 
 
 def read_log(path):
-    # only the test run: starts at the Namespace(... mode='test' ...) line
-    setup, accs = None, {}
+    # the test runs: each starts at a Namespace(... mode='test' ...) line
+    runs, setup, accs = [], None, {}
     for line in open(path, encoding='utf-8', errors='replace'):
         if line.startswith('Namespace(') and "mode='test'" in line:
+            if setup and 'Overall' in accs:
+                runs.append((setup, accs))
             setup, accs = CKPT.search(line).group(1), {}
+            abl = ABL.search(line)
+            if abl and abl.group(1) != 'none':
+                setup += '+' + abl.group(1)
         elif setup:
             m = ACC.match(line.strip())
             if m:
                 accs[m.group(1)] = float(m.group(2))
     if setup and 'Overall' in accs:
-        return setup, accs
-    return None
+        runs.append((setup, accs))
+    return runs
 
 
 def main():
@@ -40,13 +47,12 @@ def main():
     types = []
     for path in args.logs:
         res = read_log(path)
-        if res is None:
+        if not res:
             print('skipped (no finished test run):', path)
-            continue
-        ckpt, accs = res
-        runs[re.sub(r'_seed\d+$', '', ckpt)].append(accs)
-        print('%-40s %-28s overall %.2f' % (path, ckpt, accs['Overall']))
-        types += [t for t in accs if t not in types]
+        for ckpt, accs in res:
+            runs[re.sub(r'_seed\d+', '', ckpt)].append(accs)
+            print('%-40s %-44s overall %.2f' % (path, ckpt, accs['Overall']))
+            types += [t for t in accs if t not in types]
 
     setups = sorted(runs)
     print('\nmean +- std over seeds, number of seeds:', {s: len(runs[s]) for s in setups}, '\n')

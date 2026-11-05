@@ -59,3 +59,18 @@ python ${DIR}/net_grd_avst/main_avst.py --Adapter_downsample=8 --audio_dir=${DIR
 
 ![image](https://github.com/user-attachments/assets/6d38831d-67ef-45e2-918c-842d616e46a3)
 
+## DINOv2 experiments (branch `grounding-dinov2`)
+
+Code for the paper *Can Improving AI Models' Eyes Lead to Better Music Perception?*, which replaces AVST's ResNet-18 features with DINOv2 (ViT-B/14 with registers). All jobs run from the repository root on the Fox cluster (Slurm).
+
+| Paper | Script | Notes |
+|---|---|---|
+| Feature extraction | `AVST/feat_script/extract_visual_feat_14x14/extract_dinov2_feat.py` | 60 frames per video, patch tokens only, saved as `[60, 768, 16, 16]` |
+| Table I (grounding stage) | `AVST/Grounding.sh` → `AVST/grounding_gen/main_grd_gen_feat.py` | re-trains the grounding stage on saved features |
+| Table II (setups A–D, 3 seeds) | `AVST/Test.sh` | settings via `sbatch --export`: `FEATS`, `VDIM`, `NAME`, `GRD`, `TLAYERS`, `SEED` |
+| Table III, Figs. 2–3 (visual features) | `AVST/FeatureViz.sh` → `AVST/tools/feature_viz.py` | nearest-neighbour test, PCA plots, patch maps, similarity over time |
+| Table IV (input ablations) | `AVST/Ablation.sh` → `--ablate` in `AVST/net_grd_avst/main_avst.py` | audio, video or both replaced by zeros, noise or another video's input |
+| Fig. 4 (sound localisation maps) | `AVST/AttentionMaps.sh` → `AVST/tools/attention_maps.py` | seed-1 models, eight test videos |
+| Mean ± std tables | `AVST/tools/summarize_results.py avst-*.out ablate-*.out` | reads the Slurm logs |
+
+The model changes are in `AVST/net_grd_avst/net_avst.py` (`--visual_dim` for the 768→512 layer, `--temporal_layers` for the temporal Transformer).

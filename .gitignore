@@ -14,3 +14,11 @@ logs/
 # python
 __pycache__/
 *.pyc
+AVST/attention_maps/
+AVST/feature_viz/
+
+# Slurm logs and result files from Fox
+*.out
+*.tar
+ablation_table.txt
+temperature_results.txt
