@@ -25,4 +25,11 @@ cd $DIR
 #   sbatch --export=ALL,FEATS=dinov2_vitb14_reg,VDIM=768,NAME=avst_dinov2_grd,GRD=AVST/grounding_gen/models_grounding_gen/grounding_dinov2_best.pt AVST/Test.sh
 EPOCHS=${EPOCHS:-10}
 
+# Table I, ResNet-18 row: the same training on ResNet-18 features (not used by any AVST setup)
+#   sbatch --export=ALL,FEATS=res18 AVST/Grounding.sh
+if [ "$FEATS" = "res18" ]; then
+    python AVST/grounding_gen/main_grd_gen_feat.py --video_feat_dir AVST/data/feats/res18_14x14 --visual_dim 512 --epochs $EPOCHS --checkpoint grounding_res18
+    exit
+fi
+
 python AVST/grounding_gen/main_grd_gen_feat.py --video_feat_dir AVST/data/feats/dinov2_vitb14_reg --visual_dim 768 --epochs $EPOCHS --checkpoint grounding_dinov2

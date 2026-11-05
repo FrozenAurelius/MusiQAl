@@ -132,6 +132,7 @@ def main():
     models = [(label, load_model(os.path.join(args.model_dir, ckpt + '.pt'), int(vdim), int(tl), device), feats)
               for label, ckpt, feats, vdim, tl in setups]
     os.makedirs(args.out_dir, exist_ok=True)
+    focus = {}                       # label -> all max-weight ratios, for the summary at the end
 
     for video in videos:
         audio = torch.from_numpy(np.load(os.path.join(args.audio_dir, video + '.npy'))[::6].astype(np.float32)).to(device)
@@ -153,6 +154,7 @@ def main():
             for s in args.seconds:
                 # how peaked the weights are: 1.0 would mean the same weight everywhere
                 print(f'{video} {label:16s} second {s:2d}: max weight {att[s // 6].max() * n:.2f} x uniform')
+                focus.setdefault(label, []).append(float(att[s // 6].max() * n))
             rows.append([overlay(img, att[s // 6]) for img, s in zip(images, args.seconds)])
             labels.append(label)
 
@@ -160,6 +162,11 @@ def main():
         out = os.path.join(args.out_dir, video + '.png')
         fig.save(out)
         print('saved', out)
+
+    # the numbers in the paper: mean and range of the max-weight ratio per setup, over all videos and seconds
+    print('\nlargest weight / uniform weight, per setup:')
+    for label, vals in focus.items():
+        print(f'{label:16s} n={len(vals):3d}  mean {np.mean(vals):.2f}  min {min(vals):.2f}  max {max(vals):.2f}')
 
 
 if __name__ == '__main__':

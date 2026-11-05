@@ -66,11 +66,12 @@ Code for the paper *Can Improving AI Models' Eyes Lead to Better Music Perceptio
 | Paper | Script | Notes |
 |---|---|---|
 | Feature extraction | `AVST/feat_script/extract_visual_feat_14x14/extract_dinov2_feat.py` | 60 frames per video, patch tokens only, saved as `[60, 768, 16, 16]` |
-| Table I (grounding stage) | `AVST/Grounding.sh` → `AVST/grounding_gen/main_grd_gen_feat.py` | re-trains the grounding stage on saved features |
+| Table I (grounding stage) | `AVST/Grounding.sh` → `AVST/grounding_gen/main_grd_gen_feat.py` | DINOv2 row by default; ResNet-18 row with `sbatch --export=ALL,FEATS=res18 AVST/Grounding.sh` |
 | Table II (setups A–D, 3 seeds) | `AVST/Test.sh` | settings via `sbatch --export`: `FEATS`, `VDIM`, `NAME`, `GRD`, `TLAYERS`, `SEED` |
+| Table II, column Q | `python AVST/tools/question_baseline.py` | question-only baselines (per question and per template), no GPU |
 | Table III, Figs. 2–3 (visual features) | `AVST/FeatureViz.sh` → `AVST/tools/feature_viz.py` | nearest-neighbour test, PCA plots, patch maps, similarity over time |
 | Table IV (input ablations) | `AVST/Ablation.sh` → `--ablate` in `AVST/net_grd_avst/main_avst.py` | audio, video or both replaced by zeros, noise or another video's input |
-| Fig. 4 (sound localisation maps) | `AVST/AttentionMaps.sh` → `AVST/tools/attention_maps.py` | seed-1 models, eight test videos |
+| Fig. 4 (sound localisation maps) | `AVST/AttentionMaps.sh` → `AVST/tools/attention_maps.py` | seed-1 models, eight test videos; prints the mean and range of the focus ratio per setup |
 | Mean ± std tables | `AVST/tools/summarize_results.py avst-*.out ablate-*.out` | reads the Slurm logs |
 
 The model changes are in `AVST/net_grd_avst/net_avst.py` (`--visual_dim` for the 768→512 layer, `--temporal_layers` for the temporal Transformer).

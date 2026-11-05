@@ -4,7 +4,7 @@
 #
 # 1. separability: per-video labels taken from the videos' own questions (performance type,
 #    indoor/outdoor, number of instruments heard). Leave-one-out nearest-neighbour accuracy
-#    on the video's mean feature, and 2D maps (t-SNE, or PCA without scikit-learn).
+#    on the video's mean feature, and 2D maps (PCA by default, t-SNE with --method tsne).
 # 2. patch maps: the first 3 PCA components of the patch features as RGB over the frame,
 #    to see whether patches separate performers / instruments from the background.
 # 3. change over time: cosine similarity between the frames AVST uses (6 s apart) in one video,
@@ -72,16 +72,15 @@ def loo_knn(X, y, k=5):
     return 100 * correct / len(y)
 
 
-def embed_2d(X, seed=0):
+def embed_2d(X, method='pca', seed=0):
     Xn = l2n(X - X.mean(0))
-    # PCA to 50 dims first (also the fallback result, first 2 dims)
+    # PCA (via SVD): the first 2 components are the plot; 50 components are the input for t-SNE
     U, S, _ = np.linalg.svd(Xn - Xn.mean(0), full_matrices=False)
     P = U[:, :50] * S[:50]
-    try:
-        from sklearn.manifold import TSNE
+    if method == 'tsne':
+        from sklearn.manifold import TSNE   # needs scikit-learn
         return TSNE(n_components=2, perplexity=30, init='pca', random_state=seed).fit_transform(P), 't-SNE'
-    except ImportError:
-        return P[:, :2], 'PCA'
+    return P[:, :2], 'PCA'
 
 
 def scatter(ax_size, pts, y, classes, title):
@@ -127,6 +126,7 @@ def main():
     parser.add_argument('--videos', nargs='+', default=['00000155', '00000034', '00000000', '00000100'], help='videos for the patch maps')
     parser.add_argument('--seconds', type=int, nargs='+', default=[0, 30])
     parser.add_argument('--k', type=int, default=5)
+    parser.add_argument('--method', choices=['pca', 'tsne'], default='pca', help='2D projection for the plots (the paper uses PCA)')
     parser.add_argument('--out_dir', default='AVST/feature_viz')
     parser.add_argument('--tile_width', type=int, default=280)
     args = parser.parse_args()
@@ -161,7 +161,7 @@ def main():
         print(row)
         row_tiles = []
         for bname, _ in backbones:
-            pts, method = embed_2d(feats[bname][idx].mean(1))
+            pts, method = embed_2d(feats[bname][idx].mean(1), args.method)
             row_tiles.append(scatter((420, 380), pts, y, classes, '%s · %s (%s)' % (bname, lname, method)))
         tiles.append(row_tiles)
     fig = Image.new('RGB', (420 * len(backbones), 380 * len(tiles)), 'white')
